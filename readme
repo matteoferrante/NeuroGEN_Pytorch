@@ -1,1 +1,15 @@
 Pytorch implementation of some generative models
+
+
+The fmri preprocessing for sub01 is done using fsl
+
+- Motion Correction concatenating all the func files across runs and sessions of "faces" task
+- Registration to highres T1 anatomical image in the subject space - the T1w of the second session
+- Registration to the standard MNI space T1w 2mm
+
+- Inversion of the MNI atlas from MNI to subject space 
+
+
+TO DO:
+- Voxel selection and volume crop 
+- GLM over the reduced volumes
