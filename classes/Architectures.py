@@ -626,6 +626,86 @@ class VAEDecoder(nn.Module):
         return x
 
 
+class cVAEDecoder(nn.Module):
+    """Decoder class for conditional VAE"""
+
+    def __init__(self, target_shape ,latent_dim, conv_layer_list, condition_dim):
+        super().__init__()
+        """
+        Return a decoder/generator network
+        :param input_shape: tuple, the shape of the input
+        :param latent_dim: dimension of the latent space
+        :param version: string, could be "vae" of "vqvae".
+                        if "vae" it outputs a sampled vector and the parameter of the gaussian
+                        if "vq vae" it outputs a Conv2D layer with latent_dim filters
+
+        :param conv_layer_list: list, each element is a tuple in the form (n_res_block, n_res_filters)
+        :param encoder_output_shape: tuple, required if version is "vqvae"
+        for example
+        conv_layer_list= [(2,64),(3,128),(1,256)]
+
+
+        will result in a three block network
+        block 1: Conv (64) -> Res(50) -> Res(50)
+        block 2: Conv (128) -> Res(100) -> Res(100) -> Res(100)
+        block 3: conv (256) -> Res(200)
+
+        :return: decoder model
+        """
+
+
+        self.condition_dim=condition_dim
+
+
+
+        # infer the starting dimension.
+        target_shape_side = target_shape[-1]
+
+
+
+        self.startDim = target_shape_side // 2 ** len(conv_layer_list)
+
+        self.first_channels=conv_layer_list[0][-1]
+
+        #self.predecoder=nn.Unflatten(self.first_channels*self.startDim*self.startDim)
+        self.predecoder=nn.Linear(latent_dim,self.first_channels*self.startDim*self.startDim)
+        self.unflatten=nn.Unflatten(1,(self.first_channels,self.startDim,self.startDim))
+
+        self.condition =  nn.Linear(self.condition_dim,self.startDim*self.startDim)
+        self.condition2shape = nn.Unflatten(1, (1,self.startDim , self.startDim))
+        feature_layers = []
+        for conv_filters in conv_layer_list:
+            n_res_block, n_filters = conv_filters
+            feature_layers.append(
+                ConvTransposeResBlock(n_conv_filters=n_filters, n_res_block=n_res_block, n_res_filters=n_filters))
+
+        self.features = nn.Sequential(*feature_layers)
+
+        self.decoder_output=nn.LazyConvTranspose2d(target_shape[0],3,padding=1)
+        self.activation=nn.Sigmoid()
+
+    def forward(self,x,c):
+        x = self.predecoder(x)
+        x= self.unflatten(x)
+
+        c= self.condition(c)
+        c= self.condition2shape(c)
+
+        x= torch.concat((x,c),axis=1)
+        #x = x.view(x.shape[0], -1, self.startDim, self.startDim)
+        x = self.features(x)
+        x = self.decoder_output(x)
+        x = self.activation(x)
+
+        return x
+
+
+
+
+
+
+
+
 class VQVAEDecoder(nn.Module):
     """Decoder class for VQ VAE"""
 
@@ -681,6 +761,66 @@ class VQVAEDecoder(nn.Module):
         x = self.activation(x)
 
         return x
+
+
+
+class VQVAEDecoder(nn.Module):
+    """Decoder class for VQ VAE"""
+
+    def __init__(self, target_shape ,latent_dim, conv_layer_list,):
+        super().__init__()
+        """
+        Return a decoder/generator network
+        :param input_shape: tuple, the shape of the input
+        :param latent_dim: dimension of the latent space
+        :param version: string, could be "vae" of "vqvae".
+                        if "vae" it outputs a sampled vector and the parameter of the gaussian
+                        if "vq vae" it outputs a Conv2D layer with latent_dim filters
+
+        :param conv_layer_list: list, each element is a tuple in the form (n_res_block, n_res_filters)
+        :param encoder_output_shape: tuple, required if version is "vqvae"
+        for example
+        conv_layer_list= [(2,64),(3,128),(1,256)]
+
+
+        will result in a three block network
+        block 1: Conv (64) -> Res(50) -> Res(50)
+        block 2: Conv (128) -> Res(100) -> Res(100) -> Res(100)
+        block 3: conv (256) -> Res(200)
+
+        :return: decoder model
+        """
+
+        # infer the starting dimension.
+        #target_shape_side = target_shape[-1]
+        #self.startDim = target_shape_side // 2 ** len(conv_layer_list)
+        #self.first_channels=conv_layer_list[0][-1]
+
+        #self.predecoder=nn.LazyLinear(self.first_channels*self.startDim*self.startDim)
+        #self.reshape=Reshape(self.first_channels,self.startDim,self.startDim)
+        #self.preactivation=nn.LeakyReLU(negative_slope=0.2)
+
+        feature_layers = []
+        for conv_filters in conv_layer_list:
+            n_res_block, n_filters = conv_filters
+            feature_layers.append(
+                ConvTransposeResBlock(n_conv_filters=n_filters, n_res_block=n_res_block, n_res_filters=n_filters))
+
+        self.features = nn.Sequential(*feature_layers)
+
+        self.decoder_output=nn.LazyConvTranspose2d(target_shape[0],3,padding=1)
+        self.activation=nn.Sigmoid()
+
+    def forward(self,x):
+
+        #decode
+        x = self.features(x)
+        x = self.decoder_output(x)
+        x = self.activation(x)
+
+        return x
+
+
 
 
 

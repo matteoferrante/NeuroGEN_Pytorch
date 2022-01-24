@@ -60,6 +60,46 @@ def WandbImagesVAE(model,val_imgs,show=False):
     log = {f"image_sampled": wandb.Image(vis)}
     wandb.log(log)
 
+    
+def WandbImagesSIMVAE(model,val_imgs,show=False,sample=False):
+
+    target_shape=model.input_dim
+    val_imgs = val_imgs.to(device=model.device)
+
+    x_recon = model(val_imgs)
+
+    x_recon = x_recon[:100]  ## use more than 100 in bS
+    images = x_recon.cpu().detach().permute(0, 2, 3, 1).numpy()*255
+    if target_shape[0] == 1:
+        images = np.repeat(images, 3, axis=-1)
+
+    vis = build_montages(images, (target_shape[1], target_shape[-1]), (10, 10))[0]
+
+    log = {f"image": wandb.Image(vis)}
+    wandb.log(log)
+
+    if show:
+        visualize(val_imgs.cpu().permute(0,2,3,1).numpy(),images/255.)
+
+    ## just sampling
+    
+    if sample:
+
+        z = torch.randn(100, model.latent_dim).to(device=model.device)
+
+        x_sampled = model.decoder(z)
+
+        images = x_sampled.cpu().detach().permute(0, 2, 3, 1).numpy()*255
+
+        if target_shape[0] == 1:
+            images = np.repeat(images, 3, axis=-1)
+        vis = build_montages(images, (target_shape[1], target_shape[-1]), (10, 10))[0]
+
+        log = {f"image_sampled": wandb.Image(vis)}
+        wandb.log(log)
+
+    
+    
 
 
 
